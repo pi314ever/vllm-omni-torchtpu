@@ -24,7 +24,10 @@ and [AGENTS.md](AGENTS.md).
   bumps, and new features or patches in separate PRs (`R-7.1`–`R-7.3`).
 * **Stacked PRs**: Each PR in a stack must build, pass tests, and make sense on
   its own. Do not reference helpers or hooks that land in a later PR, and do not
-  add code that the next PR in the stack immediately replaces.
+  add code that the next PR in the stack immediately replaces. Because
+  contributions are primarily fork-based, target `main` on every PR so CI runs,
+  and keep dependent PRs as **Draft** with their stack dependencies listed at
+  the top of the description (e.g., `Depends on #<PR>`) until earlier PRs merge.
 * **Keep Metadata Synced with HEAD**: Update the PR title, description,
   docstrings, comments, and test logs whenever the implementation changes. State
   any unsupported scope explicitly in the PR body (`R-7.11`).

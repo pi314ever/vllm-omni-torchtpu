@@ -260,8 +260,9 @@ Core TPU kernels, `TpuPlatform`, and `vllm_torchtpu.envs` remain in
   tiny dependent follow-ups, and larger cohesive diffs where splitting would be
   artificial may stay in one PR; reviewers may still ask to split smaller
   multi-purpose diffs. Very large designs (>500 lines of core logic) need an
-  RFC/design issue first. Each PR in a stack must pass tests on its own and
-  cite its base PR explicitly.
+  RFC/design issue first. Each PR in a stack must pass tests on its own, target
+  `main` so CI runs, stay **Draft**, and cite its stack dependency (e.g.
+  `Depends on #<PR>`) until preceding PRs merge.
 - **R-7.2** **Refactor first, feature second.** Land the enabling refactor or
   cleanup as its own behavior-preserving PR before the feature/optimization PR
   that needs it.

@@ -70,56 +70,9 @@ git diff --stat origin/main...HEAD
     changes (`R-7.2`), and omit unrelated cleanups or drive-by edits (`R-7.3`).
   - Break larger end-to-end work into independently testable, reviewable steps
     (for example, landing a self-contained building block with its tests before
-    broader integration), unless `R-7.1`'s carve-outs apply.
-- **Stacked PRs workflow**: Each PR in a stack must build and pass tests on its
-  own without relying on code added in later PRs, and link the other PRs in the
-  stack.
-  - **With push access to `vllm-project/vllm-omni-torchtpu`**: Push each branch
-    to the main repo and set `--base` on PR 2 to PR 1's branch so PR 2's diff
-    shows only PR 2's changes:
-
-    ```bash
-    # PR 1 (base change off origin/main)
-    git checkout -b feat/part-1 origin/main
-    git commit -s -m "..."
-    git push -u origin feat/part-1
-    gh pr create --base main --head feat/part-1
-
-    # PR 2 (stacked on PR 1)
-    git checkout -b feat/part-2 feat/part-1
-    git commit -s -m "..."
-    git push -u origin feat/part-2
-    gh pr create --base feat/part-1 --head feat/part-2
-    ```
-
-  - **From a fork**: GitHub requires `--base` to be a branch in
-    `vllm-project/vllm-omni-torchtpu`, so base PR 1 on `upstream/main`, open PR 2
-    with `--base main`, and state `Depends on #<PR 1>` at the top of its
-    description (its diff will include PR 1's commits until PR 1 merges).
-  - **Updating a stack** (on a fork, fetch/rebase against `upstream/main` and
-    push branches to `origin`):
-
-    ```bash
-    # 1. When PR 1 gains new commits: rebase PR 2 onto PR 1
-    git checkout feat/part-2
-    git rebase feat/part-1
-    git push --force-with-lease origin feat/part-2
-
-    # 2. When rebasing an unmerged stack onto origin/main (from top branch;
-    #    --update-refs rewrites both feat/part-1 and feat/part-2)
-    git fetch origin main
-    git checkout feat/part-2
-    git rebase --update-refs origin/main
-    git push --force-with-lease origin feat/part-1 feat/part-2
-
-    # 3. After PR 1 is squash-merged into main: drop PR 1's commits
-    git fetch origin main
-    git rebase --onto origin/main feat/part-1 feat/part-2
-    git push --force-with-lease origin feat/part-2
-    # Only if PR 2 targeted feat/part-1 in the main repo (fork PRs already
-    # target main):
-    gh pr edit <pr2_number> --base main
-    ```
+    broader integration), unless `R-7.1`'s carve-outs apply. When splitting into
+    a sequence of PRs, follow the
+    [Stacked PRs workflow (reference)](#stacked-prs-workflow-reference).
 
 ## Migrating PRs from vllm-torchtpu
 
@@ -194,3 +147,62 @@ verify that the commit message contains this trailer:
 ```text
 Signed-off-by: Your Name <your.email@example.com>
 ```
+
+## Stacked PRs workflow (reference)
+
+Use this workflow only when a change needs to be split into a stack of
+dependent PRs. Because contributions here are primarily fork-based (`origin` is
+your fork, `upstream` is `vllm-project/vllm-omni-torchtpu`), GitHub requires
+`--base` to be a branch in `vllm-project/vllm-omni-torchtpu`. Every PR in a
+stack must build and pass tests on its own without relying on code added in
+later PRs:
+
+- **PR 1** targets `main` (`--base main`) off `upstream/main`.
+- **PR 2+ (stacked follow-ups)** also target `main` (`--base main`) so CI runs,
+  MUST be opened as **Draft** (`--draft`), and MUST list the stack dependency
+  at the top of the PR description (for example, `Depends on #<PR 1>`) until
+  every preceding PR merges. Its diff will include earlier PRs' commits until
+  they merge into `main`.
+
+```bash
+# PR 1 (base change off upstream/main)
+git checkout -b feat/part-1 upstream/main
+git commit -s -m "..."
+git push -u origin feat/part-1
+gh pr create --repo vllm-project/vllm-omni-torchtpu \
+  --base main --head <your-fork>:feat/part-1
+
+# PR 2 (stacked on PR 1: target main so CI runs, open as Draft)
+git checkout -b feat/part-2 feat/part-1
+git commit -s -m "..."
+git push -u origin feat/part-2
+gh pr create --repo vllm-project/vllm-omni-torchtpu \
+  --draft --base main --head <your-fork>:feat/part-2
+```
+
+### Updating a fork stack
+
+```bash
+# 1. When PR 1 gains new commits: rebase PR 2 onto PR 1
+git checkout feat/part-2
+git rebase feat/part-1
+git push --force-with-lease origin feat/part-2
+
+# 2. When rebasing an unmerged stack onto upstream/main (from top branch;
+#    --update-refs rewrites both feat/part-1 and feat/part-2)
+git fetch upstream main
+git checkout feat/part-2
+git rebase --update-refs upstream/main
+git push --force-with-lease origin feat/part-1 feat/part-2
+
+# 3. After PR 1 is squash-merged into main: drop PR 1's commits, push,
+#    and mark PR 2 ready for review once previous PRs are merged
+git fetch upstream main
+git rebase --onto upstream/main feat/part-1 feat/part-2
+git push --force-with-lease origin feat/part-2
+gh pr ready <pr2_number> --repo vllm-project/vllm-omni-torchtpu
+```
+
+*(If working directly on branches in `vllm-project/vllm-omni-torchtpu`, you may
+alternatively target `--base feat/part-1` and retarget with
+`gh pr edit <pr2_number> --base main` after PR 1 merges.)*
