@@ -32,9 +32,9 @@ from vllm_omni.model_executor.models.qwen3_omni.qwen3_omni_moe_thinker import (
 )
 
 from tests.omni_test_utils import assert_all_loaded, assert_parity
-from vllm_omni_torchtpu.patches.qwen3omni_thinker import (
+from vllm_omni_torchtpu.patches.models.qwen3_omni import (
     _AUDIO_CHUNK_LENGTHS_PATCHED,
-    maybe_patch_qwen3_omni_thinker,
+    patch_qwen3_omni_thinker,
 )
 
 # Production chunking geometry (num_mel_bins 128, n_window 50 -> 100-frame
@@ -88,10 +88,7 @@ def encoders(
     orig_get_cnn_lengths = cls._get_cnn_output_lengths
     assert not getattr(upstream_forward, _AUDIO_CHUNK_LENGTHS_PATCHED, False)
     try:
-        assert (
-            maybe_patch_qwen3_omni_thinker(["Qwen3OmniMoeForConditionalGeneration"])
-            is True
-        )
+        patch_qwen3_omni_thinker()
         assert getattr(cls.forward, _AUDIO_CHUNK_LENGTHS_PATCHED, False)
 
         torch.manual_seed(0)

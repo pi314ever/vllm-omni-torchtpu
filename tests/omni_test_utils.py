@@ -127,3 +127,20 @@ def assert_all_loaded(loaded: set[str], module: torch.nn.Module) -> None:
     assert not missing, (
         f"vllm-omni parameters not loaded from checkpoint: {sorted(missing)[:10]}"
     )
+
+
+def apply_diffusion_model_patches(*model_class_names: str) -> None:
+    """Apply shared diffusion worker patches and model-specific pipeline patches."""
+    from types import SimpleNamespace
+
+    from vllm_omni_torchtpu.patches import Stage
+    from vllm_omni_torchtpu.patches import registry as patch_registry
+
+    if not model_class_names:
+        model_class_names = ("QwenImagePipeline", "WanPipeline", "LTX2Pipeline")
+    patch_registry.apply(Stage.DIFFUSION_WORKER)
+    for model_class_name in model_class_names:
+        patch_registry.apply(
+            Stage.DIFFUSION_MODEL_LOAD,
+            od_config=SimpleNamespace(model_class_name=model_class_name),
+        )

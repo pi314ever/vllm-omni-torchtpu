@@ -276,16 +276,17 @@ def omni_ctx() -> Generator[None, None, None]:
 def _omni_model_patches(request: pytest.FixtureRequest) -> None:
     """Install the TPU model patches that the diffusion worker runs with.
 
-    Production installs them on the first diffusion attention backend lookup,
-    so without this an in-process test runs them only if an earlier test in
-    the session built attention. Engine tests are skipped: their workers
-    install the patches themselves.
+    Production applies the diffusion_worker stage, then diffusion_model_load
+    for the served pipeline, so without this an in-process test runs them
+    only if an earlier test in the session did. Loading one pipeline of each
+    patched family (Qwen-Image, Wan, LTX-2) installs every model patch. Engine
+    tests are skipped: their workers install the patches themselves.
     """
     if request.node.get_closest_marker("spawns_tpu_workers"):
         return
-    from vllm_omni_torchtpu.patches import apply_omni_model_specific_patches
+    from tests.omni_test_utils import apply_diffusion_model_patches
 
-    apply_omni_model_specific_patches()
+    apply_diffusion_model_patches()
 
 
 @pytest.fixture(autouse=True)

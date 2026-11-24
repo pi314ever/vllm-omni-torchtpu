@@ -39,10 +39,9 @@ of ``_get_cnn_output_lengths`` (processors and token-counting paths call the
 module-level ``_get_feat_extract_output_lengths`` helper), so nothing else
 observes the device change.
 
-Applied from ``TPUARModelRunner.load_model`` for
-``Qwen3OmniMoeForConditionalGeneration`` before the stage model is loaded
-(kept outside ``patch_registry.PATCHES`` until Omni patches have a dedicated
-registration hook; see #1862).
+Applied at ``Stage.AR_MODEL_LOAD`` via ``@register_patch`` from
+``TPUARModelRunner.load_model`` for ``Qwen3OmniMoeForConditionalGeneration``
+before the stage model is loaded.
 
 TODO: delete this module, its call site in ``TPUARModelRunner.load_model`` and
 its tests when vLLM-Omni is bumped to 0.33.0rc1 or later (#2910 /
@@ -58,14 +57,18 @@ upstream or once TPU float division becomes exact for these lengths.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import torch
 from vllm_torchtpu.logger import init_logger
+
+from vllm_omni_torchtpu.patches.registry import Stage, register_patch
+
+if TYPE_CHECKING:
+    import torch
 
 logger = init_logger(__name__)
 
-_QWEN3_OMNI_ARCH = "Qwen3OmniMoeForConditionalGeneration"
+_QWEN3_OMNI_ARCHS = frozenset({"Qwen3OmniMoeForConditionalGeneration"})
 
 # Idempotence marker on the wrapped ``forward``.
 _AUDIO_CHUNK_LENGTHS_PATCHED = "_tpu_audio_chunk_lengths_patched"
@@ -109,28 +112,14 @@ def _wrap_chunk_length_math(encoder_cls: type[Any]) -> bool:
     return True
 
 
-def maybe_patch_qwen3_omni_thinker(
-    architectures: list[str] | None = None,
-) -> bool:
-    """Route the audio encoder's chunk-length math through CPU on TPU.
-
-    Applies to ``Qwen3OmniMoeForConditionalGeneration`` only, matched
-    literally in ``architectures`` (the pipeline ``model_arch``
-    vLLM-Omni gives every Qwen3-Omni stage). Returns ``True`` when the
-    vLLM-Omni ``Qwen3OmniMoeAudioEncoder`` class is newly wrapped, and
-    ``False`` when the architecture does not match or the class is already
-    patched.
-    """
-    if not architectures or _QWEN3_OMNI_ARCH not in architectures:
-        return False
-
+@register_patch(Stage.AR_MODEL_LOAD, architectures=_QWEN3_OMNI_ARCHS)
+def patch_qwen3_omni_thinker() -> None:
+    """Route the audio encoder's chunk-length math through CPU on TPU."""
     from vllm_omni.model_executor.models.qwen3_omni.qwen3_omni_moe_thinker import (
         Qwen3OmniMoeAudioEncoder,
     )
 
-    patched = _wrap_chunk_length_math(Qwen3OmniMoeAudioEncoder)
-    if patched:
+    if _wrap_chunk_length_math(Qwen3OmniMoeAudioEncoder):
         logger.info(
             "Applied TPU patch: Qwen3-Omni audio encoder CPU chunk length math."
         )
-    return patched

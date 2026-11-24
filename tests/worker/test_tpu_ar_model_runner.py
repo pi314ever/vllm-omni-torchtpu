@@ -52,8 +52,8 @@ def _stub_tpu_model_runner(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(TPUModelRunner, "__init__", _fake_init)
     monkeypatch.setattr(
-        "vllm_omni_torchtpu.worker.tpu_ar_model_runner.maybe_patch_qwen3_omni_thinker",
-        lambda *_: False,
+        "vllm_omni_torchtpu.patches.registry.apply",
+        lambda *_, **__: None,
     )
 
 
@@ -183,6 +183,27 @@ def test_load_model_checks_per_step_hook_capabilities(
     else:
         with pytest.raises(NotImplementedError, match=error_match):
             tpu_ar_model_runner.load_model()
+
+
+def test_load_model_applies_ar_model_load_patches(
+    monkeypatch: pytest.MonkeyPatch,
+    tpu_ar_model_runner: TPUARModelRunner,
+) -> None:
+    from vllm_omni_torchtpu.patches import Stage
+
+    calls: list[tuple[Stage, Any]] = []
+    monkeypatch.setattr(
+        "vllm_omni_torchtpu.patches.registry.apply",
+        lambda stage, *, model_config=None, **_: calls.append((stage, model_config)),
+    )
+    model = _StageModel(torch.zeros(1, 4))
+    monkeypatch.setattr(
+        TPUModelRunner,
+        "load_model",
+        lambda self: setattr(self, "model", model),
+    )
+    tpu_ar_model_runner.load_model()
+    assert calls == [(Stage.AR_MODEL_LOAD, tpu_ar_model_runner.model_config)]
 
 
 _HIDDEN = torch.arange(8.0).reshape(2, 4)

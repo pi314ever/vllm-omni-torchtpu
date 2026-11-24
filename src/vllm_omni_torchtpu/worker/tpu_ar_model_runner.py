@@ -23,9 +23,8 @@ from vllm_omni.worker.omni_connector_model_runner_mixin import (
     needs_omni_connector,
 )
 
-from vllm_omni_torchtpu.patches.qwen3omni_thinker import (
-    maybe_patch_qwen3_omni_thinker,
-)
+from vllm_omni_torchtpu.patches import registry as patch_registry
+from vllm_omni_torchtpu.patches.registry import Stage
 from vllm_omni_torchtpu.worker.tpu_model_runner import OmniTPUModelRunner
 
 # Model capability flags that ``GPUARModelRunner`` reads (through
@@ -74,7 +73,7 @@ class TPUARModelRunner(OmniTPUModelRunner, OmniConnectorModelRunnerMixin):
 
     def load_model(self) -> None:
         """Load the stage model, then refuse one whose hooks nobody would call."""
-        maybe_patch_qwen3_omni_thinker(self.model_config.architectures)
+        patch_registry.apply(Stage.AR_MODEL_LOAD, model_config=self.model_config)
         super().load_model()
         model = self.get_model()
         has_unsupported_flags = [
